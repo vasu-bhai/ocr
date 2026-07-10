@@ -1,6 +1,6 @@
 """
 Information Extraction Engine (LLM-Powered)
-Uses Groq API (llama-3.3-70b-versatile) to extract structured JSON from raw text.
+Uses Groq API to extract structured JSON from raw text.
 Replaces legacy regex heuristics.
 """
 import json
@@ -70,7 +70,7 @@ Extraction Rules:
 5. Provide the output in strict JSON format with NO markdown blocks or surrounding text.
 """
 
-def extract_fields(tokens: List[Any], raw_text: str) -> dict:
+async def extract_fields(tokens: List[Any], raw_text: str) -> dict:
     """
     Main extraction function using Groq API and LLM JSON parsing.
     """
@@ -94,9 +94,9 @@ def extract_fields(tokens: List[Any], raw_text: str) -> dict:
 
     user_prompt = f"Extract the invoice data from the following parsed text:\n\n{text}"
 
-    client = groq.Groq(api_key=api_key)
+    client = groq.AsyncGroq(api_key=api_key)
     
-    response = client.chat.completions.create(
+    response = await client.chat.completions.create(
         model=settings.groq_model,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
@@ -104,7 +104,7 @@ def extract_fields(tokens: List[Any], raw_text: str) -> dict:
         ],
         response_format={"type": "json_object"},
         temperature=0.1,  # Low temperature for deterministic extraction
-        max_tokens=4000,
+        max_tokens=1500,
     )
 
     result_content = response.choices[0].message.content

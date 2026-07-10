@@ -92,7 +92,8 @@ class TestExtraction:
         self.extract = extract_fields
 
     def _run(self, text):
-        return self.extract([], text)
+        import asyncio
+        return asyncio.run(self.extract([], text))
 
     def test_extract_invoice_number(self):
         result = self._run("Invoice No: INV-2024-001\nTotal: $500.00")

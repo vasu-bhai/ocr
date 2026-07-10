@@ -127,7 +127,8 @@ def run_pipeline(file_path: str) -> dict:
 
         # Step 4: Extract fields
         logger.info("Sending text to LLM for structured extraction")
-        extraction = extract_fields(all_tokens, clean_text)
+        import asyncio
+        extraction = asyncio.run(extract_fields(all_tokens, clean_text))
         logger.info(f"Extraction successful. Found {len(extraction.get('line_items', []))} line items.")
         result["fields"] = extraction["fields"]
         result["confidence_scores"] = extraction["confidence_scores"]

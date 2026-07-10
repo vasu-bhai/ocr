@@ -4,6 +4,7 @@ Documents Router - Upload, status polling, result retrieval
 import os
 import uuid
 from datetime import datetime
+from typing import List
 from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks, Depends
 from sqlalchemy.orm import Session
 
@@ -82,7 +83,54 @@ async def upload_document(
     }
 
 
-async def process_document_task(doc_id: str, file_path: str):
+@router.post("/upload-batch")
+async def upload_documents_batch(
+    background_tasks: BackgroundTasks,
+    files: List[UploadFile] = File(...),
+    db: Session = Depends(get_db),
+):
+    results = []
+    for file in files:
+        if file.content_type not in ALLOWED_TYPES:
+            results.append({"filename": file.filename, "status": "failed", "error": f"Unsupported file type: {file.content_type}"})
+            continue
+
+        doc_id = str(uuid.uuid4())
+        ext = os.path.splitext(file.filename)[1] or ".pdf"
+        save_path = os.path.join(settings.upload_dir, f"{doc_id}{ext}")
+
+        logger.info(f"Uploading file from batch: {file.filename} ({file.content_type})")
+        
+        content = await file.read()
+        if len(content) > MAX_FILE_SIZE:
+            logger.warning(f"File {file.filename} rejected: too large ({len(content)} bytes)")
+            results.append({"filename": file.filename, "status": "failed", "error": f"File too large. Max {settings.max_file_size_mb}MB."})
+            continue
+
+        with open(save_path, "wb") as f:
+            f.write(content)
+
+        logger.info(f"Creating database record for {doc_id}")
+        doc = Document(
+            id=doc_id,
+            filename=file.filename,
+            file_path=save_path,
+            file_size=len(content),
+            file_type=file.content_type,
+            status="queued",
+        )
+        db.add(doc)
+        
+        logger.info(f"Queued background processing task for {doc_id}")
+        background_tasks.add_task(process_document_task, doc_id, save_path)
+        
+        results.append({"filename": file.filename, "doc_id": doc_id, "status": "queued"})
+
+    db.commit()
+    return {"uploaded": results}
+
+
+def process_document_task(doc_id: str, file_path: str):
     """Background task that runs the full extraction pipeline."""
     from app.database import SessionLocal
     db = SessionLocal()
@@ -205,3 +253,20 @@ def delete_document(doc_id: str, db: Session = Depends(get_db)):
     db.delete(doc)
     db.commit()
     return {"message": "Document deleted"}
+
+
+@router.delete("/reset")
+def reset_database(db: Session = Depends(get_db)):
+    """Deletes all documents and resets the database."""
+    docs = db.query(Document).all()
+    for doc in docs:
+        if os.path.exists(doc.file_path):
+            try:
+                os.remove(doc.file_path)
+            except Exception:
+                pass
+                
+    db.query(LineItem).delete()
+    db.query(Document).delete()
+    db.commit()
+    return {"message": "All documents deleted and database reset."}

@@ -354,7 +354,7 @@
       <!-- Upload View -->
       <div class="view active" id="view-upload">
         <div class="upload-zone" id="upload-zone">
-          <input type="file" class="upload-input" id="file-input"
+          <input type="file" class="upload-input" id="file-input" multiple
                  accept=".pdf,.jpg,.jpeg,.png,.tiff,.tif,.webp"
                  onchange="handleFileSelect(this.files)">
           <div class="upload-icon" id="upload-icon">📄</div>
@@ -591,8 +591,57 @@ dropZone.addEventListener('drop', e => {
 });
 
 function handleFileSelect(files) {
-  if (!files || !files[0]) return;
-  uploadFile(files[0]);
+  if (!files || files.length === 0) return;
+  if (files.length === 1) {
+    uploadFile(files[0]);
+  } else {
+    uploadBatch(files);
+  }
+}
+
+async function uploadBatch(files) {
+  const icon = document.getElementById('upload-icon');
+  const title = document.getElementById('upload-title');
+  const sub = document.getElementById('upload-sub');
+  const procCard = document.getElementById('processing-card');
+  const procFilename = document.getElementById('proc-filename');
+  const procStatus = document.getElementById('proc-status');
+  const procBar = document.getElementById('proc-bar');
+
+  icon.textContent = '⏳';
+  title.textContent = `Uploading ${files.length} files`;
+  sub.textContent = 'Please wait...';
+
+  procCard.style.display = 'block';
+  procFilename.textContent = `${files.length} documents`;
+  procStatus.textContent = 'Uploading batch...';
+  procBar.style.width = '15%';
+
+  const form = new FormData();
+  for(let i = 0; i < files.length; i++) {
+    form.append('files', files[i]);
+  }
+
+  try {
+    const res = await fetch(`${API}/api/upload-batch`, { method: 'POST', body: form });
+    const data = await res.json();
+
+    if (!res.ok) throw new Error(data.detail || 'Batch upload failed');
+
+    procStatus.textContent = 'Queued! Redirecting...';
+    procBar.style.width = '100%';
+
+    toast(`📤 ${files.length} files queued for processing!`, false);
+    
+    setTimeout(() => { showView('documents'); loadDocuments(); }, 1500);
+
+  } catch (e) {
+    icon.textContent = '❌';
+    title.textContent = 'Upload failed';
+    sub.textContent = e.message;
+    procCard.style.display = 'none';
+    toast('Batch upload failed: ' + e.message, true);
+  }
 }
 
 async function uploadFile(file) {
