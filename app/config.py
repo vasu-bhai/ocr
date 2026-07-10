@@ -28,7 +28,7 @@ class Settings(BaseSettings):
 
     # ── LLM Extraction (Groq) ────────────────────────────
     groq_api_key: str = ""
-    groq_model: str = "llama-3.1-8b-instant"
+    groq_model = GROQ_MODEL
 
     # ── Extraction ───────────────────────────────────────
     confidence_review_threshold: float = 0.85
