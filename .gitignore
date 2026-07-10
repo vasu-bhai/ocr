@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+venv/
+.venv/
+env/
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Environment
+.env
+*.env.local
+
+# Database
+docextract.db
+*.db
+*.sqlite
+*.sqlite3
+
+# Uploads & data (large files)
+uploads/
+logs/
+
+# Model artifacts (too large for git)
+models/ner/artifacts/
+models/layoutlm/artifacts/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# MacOS
+.DS_Store
+
+# Docker
+*.log
+
+# Extractions
+extraction_*.json
+
+# Test artifacts
+.pytest_cache/
+htmlcov/
+.coverage
+evaluation/latest_report.json

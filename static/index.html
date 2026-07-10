@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DocExtract — AI Document Extraction</title>
+<style>
+  :root {
+    --bg: #0f0f10;
+    --bg2: #1a1a1d;
+    --bg3: #242428;
+    --border: #2e2e35;
+    --border2: #3e3e48;
+    --text: #e8e8ee;
+    --text2: #9090a0;
+    --text3: #5a5a6a;
+    --accent: #6c63ff;
+    --accent2: #8b85ff;
+    --green: #22c55e;
+    --amber: #f59e0b;
+    --red: #ef4444;
+    --blue: #3b82f6;
+    --card-r: 12px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'SF Pro Text', 'Segoe UI', system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  /* ── Layout ── */
+  .shell { display: flex; height: 100vh; overflow: hidden; }
+
+  .sidebar {
+    width: 220px; min-width: 220px;
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    padding: 0;
+  }
+
+  .sidebar-logo {
+    padding: 20px 20px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .logo-mark {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .logo-icon {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: linear-gradient(135deg, var(--accent), #a78bfa);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+  }
+  .logo-text { font-size: 15px; font-weight: 600; letter-spacing: -0.3px; }
+  .logo-sub { font-size: 11px; color: var(--text3); margin-top: 1px; }
+
+  .nav { padding: 12px 10px; flex: 1; }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px; border-radius: 8px;
+    cursor: pointer; color: var(--text2);
+    font-size: 13px; font-weight: 500;
+    transition: all .15s; margin-bottom: 2px;
+    border: 1px solid transparent;
+  }
+  .nav-item:hover { background: var(--bg3); color: var(--text); }
+  .nav-item.active { background: var(--bg3); color: var(--text); border-color: var(--border); }
+  .nav-icon { width: 18px; text-align: center; font-size: 15px; }
+  .nav-badge {
+    margin-left: auto; background: var(--red);
+    color: #fff; font-size: 10px; font-weight: 600;
+    padding: 1px 6px; border-radius: 20px; min-width: 18px; text-align: center;
+  }
+
+  .sidebar-stats {
+    padding: 12px 14px;
+    border-top: 1px solid var(--border);
+  }
+  .stat-mini { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 12px; }
+  .stat-mini-label { color: var(--text3); }
+  .stat-mini-val { font-weight: 600; }
+
+  .main { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+
+  .topbar {
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--bg);
+    position: sticky; top: 0; z-index: 10;
+  }
+  .page-title { font-size: 16px; font-weight: 600; }
+  .page-sub { font-size: 12px; color: var(--text3); margin-top: 1px; }
+  .topbar-actions { display: flex; gap: 8px; }
+
+  .btn {
+    padding: 7px 14px; border-radius: 7px; border: 1px solid var(--border2);
+    background: var(--bg3); color: var(--text2); font-size: 13px; font-weight: 500;
+    cursor: pointer; transition: all .15s; display: inline-flex; align-items: center; gap: 6px;
+  }
+  .btn:hover { background: var(--border); color: var(--text); }
+  .btn-primary {
+    background: var(--accent); color: #fff; border-color: var(--accent);
+  }
+  .btn-primary:hover { background: var(--accent2); border-color: var(--accent2); }
+
+  .content { padding: 24px; flex: 1; }
+
+  /* ── Upload zone ── */
+  .upload-zone {
+    border: 2px dashed var(--border2);
+    border-radius: var(--card-r);
+    padding: 48px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: all .2s;
+    background: var(--bg2);
+    position: relative;
+  }
+  .upload-zone:hover, .upload-zone.drag-over {
+    border-color: var(--accent);
+    background: #1a1a2e;
+  }
+  .upload-icon { font-size: 40px; margin-bottom: 12px; }
+  .upload-title { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+  .upload-sub { font-size: 12px; color: var(--text3); }
+  .upload-input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+
+  .progress-bar-wrap {
+    height: 4px; background: var(--bg3); border-radius: 2px; margin-top: 16px; overflow: hidden;
+  }
+  .progress-bar {
+    height: 100%; background: var(--accent); border-radius: 2px;
+    transition: width .3s; width: 0%;
+  }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: var(--card-r); padding: 16px 20px; margin-bottom: 16px;
+  }
+  .card-head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .card-title { font-size: 13px; font-weight: 600; }
+  .card-sub { font-size: 12px; color: var(--text3); }
+
+  /* ── Field grid ── */
+  .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .field-item { }
+  .field-label {
+    font-size: 11px; font-weight: 500; color: var(--text3);
+    text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;
+  }
+  .field-value {
+    font-size: 13px; font-weight: 500;
+    background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 6px; padding: 7px 10px;
+    min-height: 32px; word-break: break-all;
+  }
+  .field-value.empty { color: var(--text3); font-style: italic; font-weight: 400; }
+  .field-value.editable {
+    cursor: text;
+    transition: border-color .15s;
+  }
+  .field-value.editable:hover { border-color: var(--border2); }
+  .field-value.editable:focus {
+    outline: none; border-color: var(--accent); background: var(--bg);
+  }
+  .field-value[contenteditable="true"] { user-select: text; }
+
+  .conf-dot {
+    display: inline-block; width: 6px; height: 6px;
+    border-radius: 50%; margin-right: 5px; vertical-align: middle;
+  }
+  .conf-high { background: var(--green); }
+  .conf-med { background: var(--amber); }
+  .conf-low { background: var(--red); }
+
+  /* ── Status badge ── */
+  .badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 11px; font-weight: 600; padding: 2px 8px;
+    border-radius: 20px; text-transform: uppercase; letter-spacing: 0.4px;
+  }
+  .badge-done { background: #14532d; color: #4ade80; }
+  .badge-review { background: #451a03; color: #fb923c; }
+  .badge-failed { background: #450a0a; color: #f87171; }
+  .badge-processing { background: #1e1b4b; color: #818cf8; }
+  .badge-queued { background: var(--bg3); color: var(--text3); }
+
+  /* ── Document list ── */
+  .doc-list { display: flex; flex-direction: column; gap: 8px; }
+  .doc-row {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px 16px;
+    display: flex; align-items: center; gap: 14px;
+    cursor: pointer; transition: all .15s;
+  }
+  .doc-row:hover { border-color: var(--border2); background: var(--bg3); }
+  .doc-row.selected { border-color: var(--accent); background: #1a1a2e; }
+  .doc-icon { font-size: 22px; flex-shrink: 0; }
+  .doc-info { flex: 1; min-width: 0; }
+  .doc-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .doc-meta { font-size: 11px; color: var(--text3); margin-top: 2px; }
+  .doc-amount { font-size: 14px; font-weight: 600; text-align: right; }
+  .doc-currency { font-size: 11px; color: var(--text3); }
+
+  /* ── Stats row ── */
+  .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+  .stat-card {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: var(--card-r); padding: 14px 16px;
+  }
+  .stat-num { font-size: 24px; font-weight: 700; margin-bottom: 2px; }
+  .stat-label { font-size: 11px; color: var(--text3); }
+
+  /* ── Line items table ── */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { text-align: left; padding: 8px 10px; font-size: 11px; font-weight: 600;
+       color: var(--text3); border-bottom: 1px solid var(--border); text-transform: uppercase; letter-spacing: 0.4px; }
+  td { padding: 9px 10px; border-bottom: 1px solid var(--border); color: var(--text2); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--bg3); }
+
+  /* ── Toast ── */
+  .toast {
+    position: fixed; bottom: 24px; right: 24px; z-index: 999;
+    background: var(--bg3); border: 1px solid var(--border2);
+    border-radius: 10px; padding: 12px 18px; font-size: 13px;
+    display: none; align-items: center; gap: 10px; min-width: 220px;
+    animation: slideUp .2s ease;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  }
+  .toast.show { display: flex; }
+  @keyframes slideUp { from { transform: translateY(12px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+  /* ── Empty state ── */
+  .empty-state {
+    text-align: center; padding: 60px 24px; color: var(--text3);
+  }
+  .empty-icon { font-size: 40px; margin-bottom: 12px; }
+  .empty-title { font-size: 15px; font-weight: 500; color: var(--text2); margin-bottom: 6px; }
+  .empty-sub { font-size: 12px; }
+
+  /* ── Review banner ── */
+  .review-banner {
+    background: #1c1200; border: 1px solid #713f12;
+    border-radius: var(--card-r); padding: 12px 16px;
+    margin-bottom: 16px; display: flex; align-items: center; gap: 12px;
+    font-size: 13px; color: #fbbf24;
+  }
+
+  /* ── Section divider ── */
+  .section-divider {
+    display: flex; align-items: center; gap: 12px; margin: 20px 0 14px;
+  }
+  .section-divider-label { font-size: 11px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.6px; white-space: nowrap; }
+  .section-divider-line { flex: 1; height: 1px; background: var(--border); }
+
+  /* ── Loading spinner ── */
+  .spinner {
+    width: 18px; height: 18px; border: 2px solid var(--border2);
+    border-top-color: var(--accent); border-radius: 50%;
+    animation: spin .7s linear infinite; display: inline-block;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+
+  /* ── Views ── */
+  .view { display: none; }
+  .view.active { display: block; }
+
+  .two-col { display: grid; grid-template-columns: 1fr 340px; gap: 16px; align-items: start; }
+
+  /* ── Raw text ── */
+  .raw-text-box {
+    background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px; font-family: 'Courier New', monospace;
+    font-size: 11px; color: var(--text2); max-height: 200px; overflow-y: auto;
+    white-space: pre-wrap; word-break: break-all; line-height: 1.6;
+  }
+</style>
+</head>
+<body>
+
+<div class="shell">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark">
+        <div class="logo-icon">📄</div>
+        <div>
+          <div class="logo-text">DocExtract</div>
+          <div class="logo-sub">AI · Production</div>
+        </div>
+      </div>
+    </div>
+
+    <nav class="nav">
+      <div class="nav-item active" onclick="showView('upload')">
+        <span class="nav-icon">⬆</span> Upload
+      </div>
+      <div class="nav-item" onclick="showView('documents')">
+        <span class="nav-icon">📋</span> Documents
+        <span class="nav-badge" id="review-badge" style="display:none">!</span>
+      </div>
+      <div class="nav-item" onclick="showView('review')">
+        <span class="nav-icon">🔍</span> Review Queue
+      </div>
+      <div class="nav-item" onclick="showView('stats')">
+        <span class="nav-icon">📊</span> Analytics
+      </div>
+      <div class="nav-item" onclick="showView('api')">
+        <span class="nav-icon">⚡</span> API Docs
+      </div>
+    </nav>
+
+    <div class="sidebar-stats" id="sidebar-stats">
+      <div class="stat-mini"><span class="stat-mini-label">Processed</span><span class="stat-mini-val" id="ss-total">—</span></div>
+      <div class="stat-mini"><span class="stat-mini-label">Accuracy</span><span class="stat-mini-val" id="ss-acc">—</span></div>
+      <div class="stat-mini"><span class="stat-mini-label">In Queue</span><span class="stat-mini-val" id="ss-queue">—</span></div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <div class="page-title" id="page-title">Upload Document</div>
+        <div class="page-sub" id="page-sub">PDF, JPEG, PNG, TIFF — max 50MB</div>
+      </div>
+      <div class="topbar-actions">
+        <button class="btn" onclick="refreshAll()">↺ Refresh</button>
+        <button class="btn btn-primary" onclick="showView('upload')">+ Upload</button>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- Upload View -->
+      <div class="view active" id="view-upload">
+        <div class="upload-zone" id="upload-zone">
+          <input type="file" class="upload-input" id="file-input"
+                 accept=".pdf,.jpg,.jpeg,.png,.tiff,.tif,.webp"
+                 onchange="handleFileSelect(this.files)">
+          <div class="upload-icon" id="upload-icon">📄</div>
+          <div class="upload-title" id="upload-title">Drop your invoice here</div>
+          <div class="upload-sub" id="upload-sub">or click to browse · PDF, Image formats</div>
+          <div class="progress-bar-wrap" id="progress-wrap" style="display:none">
+            <div class="progress-bar" id="progress-bar"></div>
+          </div>
+        </div>
+
+        <div id="processing-card" style="display:none" class="card" style="margin-top:16px">
+          <div class="card-head">
+            <div>
+              <div class="card-title" id="proc-filename">Processing...</div>
+              <div class="card-sub" id="proc-status">Running OCR pipeline</div>
+            </div>
+            <div class="spinner" id="proc-spinner"></div>
+          </div>
+          <div class="progress-bar-wrap">
+            <div class="progress-bar" id="proc-bar" style="width:0%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Documents View -->
+      <div class="view" id="view-documents">
+        <div class="stats-row" id="mini-stats">
+          <div class="stat-card"><div class="stat-num" id="s-total">0</div><div class="stat-label">Total documents</div></div>
+          <div class="stat-card"><div class="stat-num" style="color:var(--green)" id="s-done">0</div><div class="stat-label">Completed</div></div>
+          <div class="stat-card"><div class="stat-num" style="color:var(--amber)" id="s-review">0</div><div class="stat-label">Needs review</div></div>
+          <div class="stat-card"><div class="stat-num" style="color:var(--red)" id="s-failed">0</div><div class="stat-label">Failed</div></div>
+        </div>
+
+        <div class="two-col" id="doc-two-col">
+          <div>
+            <div class="doc-list" id="doc-list">
+              <div class="empty-state">
+                <div class="empty-icon">📭</div>
+                <div class="empty-title">No documents yet</div>
+                <div class="empty-sub">Upload an invoice to get started</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Detail panel -->
+          <div id="detail-panel" style="display:none">
+            <div class="card" id="detail-card">
+              <div class="card-head">
+                <div>
+                  <div class="card-title" id="d-filename">—</div>
+                  <div class="card-sub" id="d-meta">—</div>
+                </div>
+                <span id="d-status-badge"></span>
+              </div>
+
+              <div id="review-banner" class="review-banner" style="display:none">
+                ⚠️ <span>Low confidence on some fields. Please verify and correct.</span>
+              </div>
+
+              <div class="section-divider">
+                <div class="section-divider-line"></div>
+                <div class="section-divider-label">Extracted Fields</div>
+                <div class="section-divider-line"></div>
+              </div>
+
+              <div class="field-grid" id="d-fields"></div>
+
+              <div class="section-divider" style="margin-top:16px">
+                <div class="section-divider-line"></div>
+                <div class="section-divider-label">Line Items</div>
+                <div class="section-divider-line"></div>
+              </div>
+
+              <div class="table-wrap">
+                <table id="d-line-items">
+                  <thead><tr><th>Description</th><th>Qty</th><th>Unit Price</th><th>Amount</th></tr></thead>
+                  <tbody id="d-items-body"></tbody>
+                </table>
+              </div>
+
+              <div class="section-divider" style="margin-top:16px">
+                <div class="section-divider-line"></div>
+                <div class="section-divider-label">Raw OCR Text</div>
+                <div class="section-divider-line"></div>
+              </div>
+              <div class="raw-text-box" id="d-raw-text">—</div>
+
+              <div style="margin-top:16px; display:flex; gap:8px; justify-content:flex-end">
+                <button class="btn" onclick="exportJSON()">↓ JSON</button>
+                <button class="btn btn-primary" id="save-corrections-btn" onclick="saveCorrections()" style="display:none">✓ Save Corrections</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Review Queue View -->
+      <div class="view" id="view-review">
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <div class="card-title">Human Review Queue</div>
+              <div class="card-sub">Documents flagged for low-confidence extraction</div>
+            </div>
+          </div>
+          <div id="review-list">
+            <div class="empty-state">
+              <div class="empty-icon">✅</div>
+              <div class="empty-title">Queue is empty</div>
+              <div class="empty-sub">All documents have been reviewed</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Analytics View -->
+      <div class="view" id="view-stats">
+        <div class="card">
+          <div class="card-head"><div class="card-title">System Analytics</div></div>
+          <div id="analytics-content">
+            <div class="stats-row" style="grid-template-columns:repeat(3,1fr)">
+              <div class="stat-card"><div class="stat-num" id="a-total">—</div><div class="stat-label">Total processed</div></div>
+              <div class="stat-card"><div class="stat-num" id="a-acc" style="color:var(--green)">—</div><div class="stat-label">Accuracy rate</div></div>
+              <div class="stat-card"><div class="stat-num" id="a-review">—</div><div class="stat-label">Pending review</div></div>
+            </div>
+            <div style="padding:20px; text-align:center; color:var(--text3); font-size:13px">
+              Field-level metrics available after processing 10+ documents
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- API Docs View -->
+      <div class="view" id="view-api">
+        <div class="card">
+          <div class="card-head"><div class="card-title">API Reference</div><div class="card-sub">Base URL: <code style="background:var(--bg3);padding:2px 6px;border-radius:4px;font-size:11px">http://localhost:8000</code></div></div>
+
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div style="background:var(--bg3);border-radius:8px;padding:12px 14px">
+              <div style="font-size:11px;font-weight:600;color:var(--green);margin-bottom:4px">POST /api/upload</div>
+              <div style="font-size:12px;color:var(--text2)">Upload a document. Form data: <code>file</code>. Returns <code>doc_id</code>.</div>
+            </div>
+            <div style="background:var(--bg3);border-radius:8px;padding:12px 14px">
+              <div style="font-size:11px;font-weight:600;color:var(--blue);margin-bottom:4px">GET /api/status/{doc_id}</div>
+              <div style="font-size:12px;color:var(--text2)">Poll processing status. Returns: pending / processing / done / review / failed</div>
+            </div>
+            <div style="background:var(--bg3);border-radius:8px;padding:12px 14px">
+              <div style="font-size:11px;font-weight:600;color:var(--blue);margin-bottom:4px">GET /api/result/{doc_id}</div>
+              <div style="font-size:12px;color:var(--text2)">Get full extracted JSON with fields, confidence scores, and line items.</div>
+            </div>
+            <div style="background:var(--bg3);border-radius:8px;padding:12px 14px">
+              <div style="font-size:11px;font-weight:600;color:var(--amber);margin-bottom:4px">POST /api/correct/{doc_id}</div>
+              <div style="font-size:12px;color:var(--text2)">Submit human corrections. Body: <code>{"corrections": {"field": "value"}}</code></div>
+            </div>
+            <div style="background:var(--bg3);border-radius:8px;padding:12px 14px">
+              <div style="font-size:11px;font-weight:600;color:var(--blue);margin-bottom:4px">GET /api/documents</div>
+              <div style="font-size:12px;color:var(--text2)">List all documents. Query params: <code>status</code>, <code>skip</code>, <code>limit</code></div>
+            </div>
+            <div style="background:var(--bg3);border-radius:8px;padding:12px 14px">
+              <div style="font-size:11px;font-weight:600;color:var(--blue);margin-bottom:4px">GET /api/review-queue</div>
+              <div style="font-size:12px;color:var(--text2)">Documents needing human review.</div>
+            </div>
+            <div style="background:var(--bg3);border-radius:8px;padding:12px 14px">
+              <div style="font-size:11px;font-weight:600;color:var(--blue);margin-bottom:4px">GET /api/stats</div>
+              <div style="font-size:12px;color:var(--text2)">System statistics: totals, accuracy rate, queue depth.</div>
+            </div>
+            <div style="background:var(--bg3);border-radius:8px;padding:12px 14px">
+              <div style="font-size:11px;font-weight:600;color:var(--red);margin-bottom:4px">DELETE /api/documents/{doc_id}</div>
+              <div style="font-size:12px;color:var(--text2)">Delete a document and its extracted data.</div>
+            </div>
+          </div>
+
+          <div style="margin-top:16px;background:var(--bg3);border-radius:8px;padding:12px 14px">
+            <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:8px">Example: Upload via cURL</div>
+            <pre style="font-size:11px;color:var(--text2);white-space:pre-wrap">curl -X POST http://localhost:8000/api/upload \
+  -F "file=@invoice.pdf"
+
+# Response:
+# {"doc_id": "abc-123", "status": "queued"}
+
+curl http://localhost:8000/api/result/abc-123</pre>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </main>
+</div>
+
+<div class="toast" id="toast">
+  <span id="toast-icon">✓</span>
+  <span id="toast-msg">Done</span>
+</div>
+
+<script>
+const API = '';  // Same origin — FastAPI serves both API and static
+
+let currentDocId = null;
+let pollTimer = null;
+let allDocs = [];
+let stats = {};
+
+// ── Navigation ───────────────────────────────────────────────────────────────
+const PAGE_META = {
+  upload:    ['Upload Document', 'PDF, JPEG, PNG, TIFF — max 50MB'],
+  documents: ['Documents', 'All processed invoices and receipts'],
+  review:    ['Review Queue', 'Documents needing human verification'],
+  stats:     ['Analytics', 'Extraction performance and accuracy'],
+  api:       ['API Reference', 'Integrate DocExtract into your workflow'],
+};
+
+function showView(name) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById(`view-${name}`).classList.add('active');
+  const navItems = document.querySelectorAll('.nav-item');
+  navItems.forEach(n => { if (n.textContent.toLowerCase().includes(name.slice(0,4))) n.classList.add('active'); });
+  const [title, sub] = PAGE_META[name];
+  document.getElementById('page-title').textContent = title;
+  document.getElementById('page-sub').textContent = sub;
+
+  if (name === 'documents') loadDocuments();
+  if (name === 'review') loadReviewQueue();
+  if (name === 'stats') loadStats();
+}
+
+// ── Upload ────────────────────────────────────────────────────────────────────
+const dropZone = document.getElementById('upload-zone');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('drag-over');
+  handleFileSelect(e.dataTransfer.files);
+});
+
+function handleFileSelect(files) {
+  if (!files || !files[0]) return;
+  uploadFile(files[0]);
+}
+
+async function uploadFile(file) {
+  const icon = document.getElementById('upload-icon');
+  const title = document.getElementById('upload-title');
+  const sub = document.getElementById('upload-sub');
+  const procCard = document.getElementById('processing-card');
+  const procFilename = document.getElementById('proc-filename');
+  const procStatus = document.getElementById('proc-status');
+  const procBar = document.getElementById('proc-bar');
+
+  icon.textContent = '⏳';
+  title.textContent = `Uploading ${file.name}`;
+  sub.textContent = `${(file.size / 1024).toFixed(0)} KB`;
+
+  procCard.style.display = 'block';
+  procFilename.textContent = file.name;
+  procStatus.textContent = 'Uploading...';
+  procBar.style.width = '15%';
+
+  const form = new FormData();
+  form.append('file', file);
+
+  try {
+    const res = await fetch(`${API}/api/upload`, { method: 'POST', body: form });
+    const data = await res.json();
+
+    if (!res.ok) throw new Error(data.detail || 'Upload failed');
+
+    currentDocId = data.doc_id;
+    procStatus.textContent = 'OCR + extraction running...';
+    procBar.style.width = '40%';
+
+    toast('📤 Uploaded! Processing...', false);
+    pollStatus(data.doc_id, procStatus, procBar, file.name);
+
+  } catch (e) {
+    icon.textContent = '❌';
+    title.textContent = 'Upload failed';
+    sub.textContent = e.message;
+    procCard.style.display = 'none';
+    toast('Upload failed: ' + e.message, true);
+  }
+}
+
+function pollStatus(docId, statusEl, barEl, filename) {
+  let progress = 40;
+  if (pollTimer) clearInterval(pollTimer);
+
+  pollTimer = setInterval(async () => {
+    try {
+      const res = await fetch(`${API}/api/status/${docId}`);
+      const data = await res.json();
+      const status = data.status;
+
+      progress = Math.min(progress + 8, 90);
+      if (barEl) barEl.style.width = progress + '%';
+
+      if (status === 'done' || status === 'review') {
+        clearInterval(pollTimer);
+        if (barEl) barEl.style.width = '100%';
+        if (statusEl) statusEl.textContent = status === 'review' ? 'Done — needs review' : 'Extraction complete!';
+
+        document.getElementById('upload-icon').textContent = status === 'review' ? '⚠️' : '✅';
+        document.getElementById('upload-title').textContent = status === 'review' ? 'Done — review needed' : 'Extraction complete!';
+        document.getElementById('upload-sub').textContent = filename;
+
+        toast(status === 'review' ? '⚠️ Done — some fields need review' : '✅ Extraction complete!', false);
+        setTimeout(() => { showView('documents'); loadDocuments(); }, 1200);
+
+      } else if (status === 'failed') {
+        clearInterval(pollTimer);
+        if (statusEl) statusEl.textContent = 'Processing failed';
+        document.getElementById('upload-icon').textContent = '❌';
+        toast('❌ Processing failed', true);
+      }
+    } catch (e) { /* network hiccup, keep polling */ }
+  }, 1500);
+}
+
+// ── Documents ─────────────────────────────────────────────────────────────────
+async function loadDocuments() {
+  try {
+    const [docsRes, statsRes] = await Promise.all([
+      fetch(`${API}/api/documents?limit=100`),
+      fetch(`${API}/api/stats`),
+    ]);
+    const docsData = await docsRes.json();
+    const statsData = await statsRes.json();
+    allDocs = docsData.documents || [];
+    stats = statsData;
+
+    renderDocList(allDocs);
+    updateStats(statsData);
+  } catch (e) {
+    console.error('Load error:', e);
+  }
+}
+
+function updateStats(s) {
+  document.getElementById('s-total').textContent = s.total || 0;
+  document.getElementById('s-done').textContent = s.done || 0;
+  document.getElementById('s-review').textContent = s.needs_review || 0;
+  document.getElementById('s-failed').textContent = s.failed || 0;
+  document.getElementById('ss-total').textContent = s.total || 0;
+  document.getElementById('ss-acc').textContent = (s.accuracy_rate || 0) + '%';
+  document.getElementById('ss-queue').textContent = s.processing || 0;
+
+  const badge = document.getElementById('review-badge');
+  if (s.needs_review > 0) {
+    badge.textContent = s.needs_review;
+    badge.style.display = 'inline';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+function renderDocList(docs) {
+  const list = document.getElementById('doc-list');
+  if (!docs.length) {
+    list.innerHTML = `<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-title">No documents yet</div><div class="empty-sub">Upload an invoice to get started</div></div>`;
+    return;
+  }
+
+  list.innerHTML = docs.map(d => `
+    <div class="doc-row ${currentDocId === d.id ? 'selected' : ''}"
+         onclick="selectDoc('${d.id}')">
+      <div class="doc-icon">${fileIcon(d.file_type)}</div>
+      <div class="doc-info">
+        <div class="doc-name">${esc(d.filename)}</div>
+        <div class="doc-meta">${esc(d.vendor_name || '—')} · ${esc(d.invoice_date || '—')}</div>
+      </div>
+      <div>
+        <div class="doc-amount">${d.total_amount ? fmtAmt(d.total_amount) : '—'}</div>
+        <div class="doc-currency">${d.currency || ''}</div>
+      </div>
+      <span class="badge badge-${d.status}">${d.status}</span>
+    </div>
+  `).join('');
+}
+
+async function selectDoc(id) {
+  currentDocId = id;
+  renderDocList(allDocs);  // re-render to show selection
+
+  const res = await fetch(`${API}/api/result/${id}`);
+  const d = await res.json();
+
+  if (d.status === 'processing' || d.status === 'queued') {
+    toast('Still processing...', false);
+    return;
+  }
+
+  document.getElementById('detail-panel').style.display = 'block';
+  document.getElementById('d-filename').textContent = allDocs.find(x => x.id === id)?.filename || 'Document';
+  document.getElementById('d-meta').textContent = `ID: ${id.slice(0,8)}... · ${d.processed_at?.slice(0,10) || 'unknown date'}`;
+  document.getElementById('d-status-badge').innerHTML = `<span class="badge badge-${d.status}">${d.status}</span>`;
+
+  // Review banner
+  document.getElementById('review-banner').style.display = d.needs_review ? 'flex' : 'none';
+  document.getElementById('save-corrections-btn').style.display = d.status !== 'failed' ? 'inline-flex' : 'none';
+
+  // Fields
+  const fields = [
+    {key: 'invoice_number', label: 'Invoice Number'},
+    {key: 'invoice_date', label: 'Invoice Date'},
+    {key: 'due_date', label: 'Due Date'},
+    {key: 'vendor_name', label: 'Vendor Name'},
+    {key: 'vendor_address', label: 'Vendor Address'},
+    {key: 'buyer_name', label: 'Buyer Name'},
+    {key: 'subtotal', label: 'Subtotal'},
+    {key: 'tax_amount', label: 'Tax Amount'},
+    {key: 'total_amount', label: 'Total Amount'},
+    {key: 'currency', label: 'Currency'},
+    {key: 'payment_terms', label: 'Payment Terms'},
+    {key: 'po_number', label: 'PO Number'},
+  ];
+
+  const confs = d.confidence_scores || {};
+  document.getElementById('d-fields').innerHTML = fields.map(f => {
+    const val = d[f.key];
+    const conf = confs[f.key];
+    const confClass = conf >= 0.8 ? 'conf-high' : conf >= 0.55 ? 'conf-med' : 'conf-low';
+    const confDot = conf !== undefined ? `<span class="conf-dot ${confClass}"></span>` : '';
+    return `
+      <div class="field-item">
+        <div class="field-label">${confDot}${f.label}</div>
+        <div class="field-value ${val ? 'editable' : 'empty'}"
+             contenteditable="${val ? 'true' : 'false'}"
+             data-field="${f.key}"
+             onfocus="enableSave()"
+             >${esc(val ?? '—')}</div>
+      </div>
+    `;
+  }).join('');
+
+  // Line items
+  const tbody = document.getElementById('d-items-body');
+  if (d.line_items && d.line_items.length) {
+    tbody.innerHTML = d.line_items.map(li => `
+      <tr>
+        <td>${esc(li.description || '—')}</td>
+        <td>${li.quantity ?? '—'}</td>
+        <td>${li.unit_price ? fmtAmt(li.unit_price) : '—'}</td>
+        <td>${li.amount ? fmtAmt(li.amount) : '—'}</td>
+      </tr>
+    `).join('');
+  } else {
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text3)">No line items extracted</td></tr>';
+  }
+
+  // Raw OCR text
+  const rawRes = await fetch(`${API}/api/result/${id}`);
+  document.getElementById('d-raw-text').textContent = d.raw_text || '(no OCR text available)';
+}
+
+function enableSave() {
+  document.getElementById('save-corrections-btn').style.display = 'inline-flex';
+}
+
+async function saveCorrections() {
+  if (!currentDocId) return;
+  const fields = document.querySelectorAll('[data-field]');
+  const corrections = {};
+  fields.forEach(el => {
+    const field = el.dataset.field;
+    const val = el.textContent.trim();
+    if (val && val !== '—') corrections[field] = val;
+  });
+
+  try {
+    const res = await fetch(`${API}/api/correct/${currentDocId}`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({corrections, corrected_by: 'user'})
+    });
+    if (res.ok) {
+      toast('✅ Corrections saved');
+      loadDocuments();
+    } else {
+      throw new Error('Save failed');
+    }
+  } catch(e) {
+    toast('❌ Could not save', true);
+  }
+}
+
+function exportJSON() {
+  if (!currentDocId) return;
+  fetch(`${API}/api/result/${currentDocId}`)
+    .then(r => r.json())
+    .then(d => {
+      const blob = new Blob([JSON.stringify(d, null, 2)], {type:'application/json'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `extraction_${currentDocId.slice(0,8)}.json`;
+      a.click();
+    });
+}
+
+// ── Review Queue ──────────────────────────────────────────────────────────────
+async function loadReviewQueue() {
+  const res = await fetch(`${API}/api/review-queue`);
+  const data = await res.json();
+  const list = document.getElementById('review-list');
+  if (!data.documents?.length) {
+    list.innerHTML = `<div class="empty-state"><div class="empty-icon">✅</div><div class="empty-title">Queue is empty</div><div class="empty-sub">All documents reviewed</div></div>`;
+    return;
+  }
+  list.innerHTML = data.documents.map(d => `
+    <div class="doc-row" onclick="showView('documents'); setTimeout(()=>selectDoc('${d.id}'),200)">
+      <div class="doc-icon">${fileIcon(d.file_type)}</div>
+      <div class="doc-info">
+        <div class="doc-name">${esc(d.filename)}</div>
+        <div class="doc-meta">${esc(d.vendor_name || '—')} · ${esc(d.invoice_date || '—')}</div>
+      </div>
+      <span class="badge badge-review">Review</span>
+    </div>
+  `).join('');
+}
+
+// ── Stats ─────────────────────────────────────────────────────────────────────
+async function loadStats() {
+  const res = await fetch(`${API}/api/stats`);
+  const s = await res.json();
+  document.getElementById('a-total').textContent = s.total || 0;
+  document.getElementById('a-acc').textContent = (s.accuracy_rate || 0) + '%';
+  document.getElementById('a-review').textContent = s.needs_review || 0;
+}
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+async function refreshAll() {
+  if (confirm("Are you sure you want to delete ALL uploaded files and data?")) {
+    try {
+      await fetch(`${API}/api/reset`, { method: 'DELETE' });
+      toast('🗑️ All data and files deleted');
+      currentDocId = null;
+      document.getElementById('detail-panel').style.display = 'none';
+      loadDocuments();
+      loadStats();
+    } catch (e) {
+      toast('❌ Failed to delete data', true);
+    }
+  } else {
+    loadDocuments();
+    loadStats();
+    toast('↺ Refreshed');
+  }
+}
+
+function esc(s) {
+  if (s === null || s === undefined) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function fmtAmt(n) {
+  return Number(n).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+}
+
+function fileIcon(type) {
+  if (!type) return '📄';
+  if (type.includes('pdf')) return '📕';
+  if (type.includes('image')) return '🖼';
+  return '📄';
+}
+
+let toastTimer;
+function toast(msg, isErr = false) {
+  const el = document.getElementById('toast');
+  const msgEl = document.getElementById('toast-msg');
+  const iconEl = document.getElementById('toast-icon');
+  msgEl.textContent = msg;
+  iconEl.textContent = isErr ? '✗' : '✓';
+  el.style.borderColor = isErr ? 'var(--red)' : 'var(--green)';
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+// Init
+loadDocuments();
+setInterval(loadStats, 15000);
+</script>
+</body>
+</html>
